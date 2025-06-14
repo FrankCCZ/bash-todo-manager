@@ -1,0 +1,8 @@
+daata/task.db
+*.bak
+*.tmp
+*.log
+.DS_Store
+.vscode/
+.idea/
+test_*
