@@ -79,6 +79,77 @@ is_overdue() {
     [[ -n "$1" ]] && [[ "$1" < "$(date +%Y-%m-%d)" ]]
 }
 
+# Zobrazování úkolů
+display_tasks() {
+    local filter_type="$1"    # "status", "search", nebo "all"
+    local filter_value="$2"   # hodnota filtru
+    local header_prefix="$3"  # prefix pro hlavičku (např. "Výsledky vyhledávání pro:")
+    
+    # Pokud neexistuje soubor, zobrazíme prázdnou tabulku
+    if [[ ! -f "data/tasks.db" ]]; then
+        if [[ -n "$header_prefix" ]]; then
+            echo "$header_prefix '$filter_value'"
+        fi
+        echo "ID | Vytvořeno  | Deadline   | Status | Název"
+        echo "---|------------|------------|--------|-------"
+        return 0
+    fi
+    
+    # Zobrazíme hlavičku
+    if [[ -n "$header_prefix" ]]; then
+        echo "$header_prefix '$filter_value'"
+    fi
+    echo "ID | Vytvořeno  | Deadline   | Status | Název"
+    echo "---|------------|------------|--------|-------"
+    
+    while IFS='|' read -r id created deadline status name; do
+        # Aplikace filtru podle typu
+        case "$filter_type" in
+            "status")
+                case "$filter_value" in
+                    "pending")
+                        [[ "$status" != "pending" ]] && continue
+                        ;;
+                    "completed")
+                        [[ "$status" != "completed" ]] && continue
+                        ;;
+                    "overdue")
+                        [[ "$status" != "pending" ]] && continue
+                        if ! is_overdue "$deadline"; then
+                            continue
+                        fi
+                        ;;
+                    "all")
+                        # Nezfiltrujeme nic
+                        ;;
+                esac
+                ;;
+            "search")
+                [[ "$name" != *"$filter_value"* ]] && continue
+                ;;
+            "all")
+                # Nezfiltrujeme nic
+                ;;
+        esac
+        
+        # Formátování výstupu
+        local deadline_display="${deadline:-    N/A   }"
+        local today=$(date +%Y-%m-%d)
+
+        if [[ "$status" == "completed" ]]; then
+            echo -e "${DGREEN}$id | $created | $deadline_display | $status | $name${NC}"
+        elif [[ "$status" == "pending" ]] && is_overdue "$deadline"; then
+            echo -e "${RED}$id | $created | $deadline_display | $status | $name${NC}"
+        elif [[ "$status" == "pending" ]] && [[ -n "$deadline" ]] && [[ "$deadline" < "$(date -d '+3 days' +%Y-%m-%d)" ]]; then
+            echo -e "${YELLOW}$id | $created | $deadline_display | $status | $name${NC}"
+        else
+    echo "$id | $created | $deadline_display | $status | $name"
+fi
+       
+    done < "data/tasks.db" 2>/dev/null
+}
+
+
 # Escape speciální znaky pro CSV
 escape_csv() {
     local text="${1//\\/\\\\}"  # vypustit zpětná lomítka

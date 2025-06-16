@@ -19,33 +19,32 @@ add_task() {
     local deadline=""
     
     # Zpracování deadline
-    if [[ -n "$deadline_input" ]]; then
-    while true; do
-        if validate_deadline "$deadline_input"; then
-            deadline=$(process_deadline "$deadline_input")
-            if is_deadline_valid "$deadline"; then
-                break
+   if [[ -n "$deadline_input" ]]; then
+        while true; do
+            if validate_deadline "$deadline_input"; then
+                deadline=$(process_deadline "$deadline_input")
+                if is_deadline_valid "$deadline"; then
+                    break
+                else
+                    echo -e "${RED}Chyba: Deadline nemůže být v minulosti!${NC}"
+                fi
             else
-                error_msg="Chyba: Deadline nemůže být v minulosti!"
+                echo -e "${RED}Chyba: Neplatný formát deadline!${NC}"
             fi
-        else
-            error_msg="Chyba: Neplatný formát deadline!"
-        fi
-        
-        # Zobrazit chybu a instrukce
-        echo -e "${RED}$error_msg${NC}"
-        echo "Zadejte deadline jako:"
-        echo "  - Počet dní (např. 7 = za týden)"
-        echo "  - Konkrétní datum (YYYY-MM-DD)"
-        echo "  - Enter pokud není deadline"
-        
-        read -p "Deadline: " deadline_input
-        if [[ -z "$deadline_input" ]]; then
-            deadline=""
-            break
-        fi
-    done
-fi
+            
+            # Zobrazit instrukce a zeptat se znovu
+            echo "Zadejte deadline jako:"
+            echo "  - Počet dní (např. 7 = za týden)"
+            echo "  - Konkrétní datum (YYYY-MM-DD)"
+            echo "  - Enter pokud není deadline"
+            
+            read -p "Deadline: " deadline_input
+            if [[ -z "$deadline_input" ]]; then
+                deadline=""
+                break
+            fi
+        done
+    fi
     
     # Escape speciálních znaků
     name=$(escape_csv "$name")
@@ -59,6 +58,7 @@ fi
     echo -e "${YELLOW}Úkol přidán s ID: $id${NC}"
     return 0
 }
+
 
 # Výpis úkolů
 list_tasks() {
@@ -74,41 +74,7 @@ list_tasks() {
         *) filter="all" ;;
     esac
     
-    if [[ ! -f "data/tasks.db" || ! -s "data/tasks.db" ]]; then
-        echo -e "${YELLOW}Žádné úkoly nenalezeny.${NC}"
-        return 0
-    fi
-    
-    echo "ID | Vytvořeno  | Deadline   | Status | Název"
-    echo "---|------------|------------|--------|-------"
-    
-    while IFS='|' read -r id created deadline status name; do
-        # Aplikace filtru
-        case "$filter" in
-            "pending")
-                [[ "$status" != "pending" ]] && continue
-                ;;
-            "completed")
-                [[ "$status" != "completed" ]] && continue
-                ;;
-            "overdue")
-                [[ "$status" != "pending" ]] && continue
-                if ! is_overdue "$deadline"; then
-                    continue
-                fi
-                ;;
-        esac
-        
-        # Formátování výstupu
-        local deadline_display="${deadline:-    N/A   }"
-        if [[ "$status" == "pending" ]] && is_overdue "$deadline"; then
-            echo -e "${RED}$id | $created | $deadline_display | $status | $name${NC}"
-        elif [[ "$status" == "completed" ]]; then
-            echo -e "${DGREEN}$id | $created | $deadline_display | $status | $name${NC}"
-        else
-            echo "$id | $created | $deadline_display | $status | $name"
-        fi
-    done < "data/tasks.db"
+    display_tasks "status" "$filter"
 }
 
 # Označení úkolu jako dokončený
@@ -170,9 +136,7 @@ delete_task() {
     return 0
 }
 
-
-
-# Vyhledávání v úkolech
+# Vyhledávání
 search_tasks() {
     local search_term="$1"
     
@@ -181,27 +145,7 @@ search_tasks() {
         return 1
     fi
     
-    if [[ ! -f "data/tasks.db" || ! -s "data/tasks.db" ]]; then
-        echo -e "${YELLOW}Žádné úkoly nenalezeny.${NC}"
-        return 0
-    fi
-    
-    echo "Výsledky vyhledávání pro: '$search_term'"
-    echo "ID | Vytvořeno  | Deadline   | Status | Název"
-    echo "---|------------|------------|--------|-------"
-    
-    local found=0
-    while IFS='|' read -r id created deadline status name; do
-        if [[ "$name" == *"$search_term"* ]]; then
-            local deadline_display="${deadline:-    N/A   }"
-            echo "$id | $created | $deadline_display | $status | $name"
-            found=1
-        fi
-    done < "data/tasks.db"
-    
-    if [[ $found -eq 0 ]]; then
-        echo -e "${YELLOW}Žádné úkoly nebyly nalezeny.${NC}"
-    fi
+    display_tasks "search" "$search_term" "Výsledky vyhledávání pro:"
 }
 
 # Statistiky úkolů
